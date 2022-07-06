@@ -11,9 +11,10 @@ namespace UDPSender
 {
     class Program
     {
+        private static bool _readFromFile = false;
+
         public static void Main(string[] args)
         {
-
             System.Timers.Timer timer = new System.Timers.Timer();
             timer.Interval = 5000;
             timer.Elapsed += SendPacket;
@@ -21,57 +22,68 @@ namespace UDPSender
             timer.Enabled = true;
 
             Console.WriteLine("Press the Enter key to exit the program at any time... ");
-            Console.ReadLine();
+
+            Console.WriteLine("1. Read from file");
+            Console.WriteLine("2. Debug packet");
+            Console.WriteLine("X: Close program");
+
+            string? input = string.Empty;
+
+            while (input != "x")
+            {
+                input = Console.ReadLine();
+
+                switch (input?.ToLower())
+                {
+                    case "1":
+                        _readFromFile = true;
+                        break;
+                    case "2":
+                        _readFromFile = false;
+                        break;
+                    case "x":
+                        timer.Enabled = false;
+                        break;
+                }
+            }
         }
 
         private static void SendPacket(object source, System.Timers.ElapsedEventArgs e)
         {
-            NearbyPlayer test = new NearbyPlayer()
+            string jsonData = string.Empty;
+
+            if (!_readFromFile)
             {
-                version = "2",
-                build = "100672",
-                account = "<AccountID>",
-                secondary_account = "<AccountID>",
-                avatar = 166633186212728153,
-                level = 1953,
-                pframe = 166633186212712223,
-                platform = 1,
-                elevel = 2,
-                endors = new NearbyPlayer.Endorsement[]
+                NearbyPlayer test = new NearbyPlayer();
+                // Populate test data here.
+                
+                jsonData = JsonConvert.SerializeObject(test);
+            }
+            else
+            {
+                // Hacky way but lets you have pretty json in the file
+                jsonData = File.ReadAllText(Directory.GetCurrentDirectory() + "\\packet.json");
+                var dummy = JsonConvert.DeserializeObject<dynamic>(jsonData);
+                jsonData = JsonConvert.SerializeObject(dummy);
+            }
+
+            if (!string.IsNullOrEmpty(jsonData))
+            {
+                using (UdpClient client = new UdpClient(4242))
                 {
-                    new NearbyPlayer.Endorsement()
-                    {
-                        id = NearbyPlayer.Shotcaller,
-                        count = 63
-                    },
-                    new NearbyPlayer.Endorsement()
-                    {
-                        id = NearbyPlayer.GoodTeammate,
-                        count = 1266
-                    },
-                    new NearbyPlayer.Endorsement()
-                    {
-                        id = NearbyPlayer.Sportsmanship,
-                        count = 622
-                    }
+                    IPAddress address = IPAddress.Parse("224.0.0.5");
+
+
+                    Console.WriteLine("Sending nearby player packet");
+
+                    byte[] encodedData = Encoding.ASCII.GetBytes(jsonData);
+
+                    Console.WriteLine(jsonData);
+
+                    IPEndPoint endpoint = new IPEndPoint(address, 4242);
+                    client.Send(encodedData, encodedData.Length, endpoint);
                 }
-            };
-
-            using (UdpClient client = new UdpClient(4242))
-            {
-                IPAddress address = IPAddress.Parse("224.0.0.5");
-
-                string jsonData = JsonConvert.SerializeObject(test);
-
-                Console.WriteLine("Sending nearby player packet");
-
-                byte[] encodedData = Encoding.ASCII.GetBytes(jsonData);
-
-                Console.WriteLine(jsonData);
-
-                IPEndPoint endpoint = new IPEndPoint(address, 4242);
-                client.Send(encodedData, encodedData.Length, endpoint);
-            }            
+            }
         }
     }
 }
